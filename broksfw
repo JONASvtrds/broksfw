@@ -1,0 +1,156 @@
+-- Biblioteca de UI simples para Roblox com botão de remoção de roupas e teleporte
+
+local UILibrary = {}
+
+-- Função para criar uma nova tela GUI
+function UILibrary:CreateScreenGui()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CustomScreenGui"
+    screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    return screenGui
+end
+
+-- Função para criar um quadro arrastável
+function UILibrary:CreateDraggableFrame(parent, position, size)
+    local frame = Instance.new("Frame")
+    frame.Name = "DraggableFrame"
+    frame.Position = UDim2.new(position.X.Scale, position.X.Offset, position.Y.Scale, position.Y.Offset)
+    frame.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset)
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    frame.Parent = parent
+    
+    -- Tornar o quadro arrastável
+    local UIS = game:GetService("UserInputService")
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+    
+    return frame
+end
+
+-- Função para criar um botão
+function UILibrary:CreateButton(parent, text, position, size, callback)
+    local button = Instance.new("TextButton")
+    button.Name = "CustomButton"
+    button.Text = text
+    button.Position = UDim2.new(position.X.Scale, position.X.Offset, position.Y.Scale, position.Y.Offset)
+    button.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset)
+    button.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Vermelho como padrão
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Parent = parent
+
+    button.MouseButton1Click:Connect(function()
+        callback()
+    end)
+    
+    return button
+end
+
+-- Função para remover roupas e acessórios
+function removeAllClothesAndAccessories()
+    local character = game.Players.LocalPlayer.Character
+    if character then
+        for _, item in pairs(character:GetChildren()) do
+            if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("Hat") or item:IsA("Clothing") then
+                item:Destroy()
+            end
+        end
+    end
+end
+
+-- Função para teleportar e grudar em um jogador aleatório
+local teleportEnabled = false
+
+function teleportAndStick()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+
+    -- Escolher um jogador aleatório (exceto o próprio jogador)
+    local target
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            target = player
+            break
+        end
+    end
+    
+    -- Teleportar e grudar no jogador aleatório
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local humanoidRootPart = target.Character.HumanoidRootPart
+        LocalPlayer.Character.HumanoidRootPart.Anchored = true  -- Ancorar para não cair
+
+        -- Teletransportar imediatamente para trás do jogador
+        LocalPlayer.Character:SetPrimaryPartCFrame(humanoidRootPart.CFrame * CFrame.new(0, 0, -2))  -- Aproximar mais do jogador
+
+        -- Movimento suave para frente e para trás
+        while teleportEnabled do
+            for i = 1, 10 do
+                LocalPlayer.Character:SetPrimaryPartCFrame(humanoidRootPart.CFrame * CFrame.new(0, 0, -1.5))  -- Para trás
+                wait(0.3)  -- Aumentar a velocidade
+                LocalPlayer.Character:SetPrimaryPartCFrame(humanoidRootPart.CFrame * CFrame.new(0, 0, -2))  -- Para frente
+                wait(0.3)  -- Aumentar a velocidade
+            end
+        end
+    end
+end
+
+-- Função para ativar/desativar o teleporte
+function toggleTeleportAndStick()
+    teleportEnabled = not teleportEnabled
+    if teleportEnabled then
+        teleportAndStick()
+    else
+        local LocalPlayer = game.Players.LocalPlayer
+        LocalPlayer.Character.HumanoidRootPart.Anchored = false
+    end
+end
+
+-- Inicialização da biblioteca
+local screenGui = UILibrary:CreateScreenGui()
+local draggableFrame = UILibrary:CreateDraggableFrame(screenGui, UDim2.new(0.5, -150, 0.5, -150), UDim2.new(0, 300, 0, 300))
+
+local removeClothesAndTeleportButton = UILibrary:CreateButton(draggableFrame, "eitapreula", UDim2.new(0.5, -50, 0.5, -25), UDim2.new(0, 100, 0, 50), function()
+    removeAllClothesAndAccessories()
+    toggleTeleportAndStick()
+end)
+
+-- Função para fechar a UI ao pressionar Control esquerdo
+local UIS = game:GetService("UserInputService")
+
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftControl then
+        draggableFrame.Visible = not draggableFrame.Visible
+    end
+end)
